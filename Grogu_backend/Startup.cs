@@ -32,6 +32,19 @@ namespace Grogu_backend
             {
                 c.SwaggerDoc("v1", new OpenApiInfo { Title = "Grogu_backend", Version = "v1" });
             });
+
+            services.AddCors(options =>
+            {
+                options.AddPolicy("FrontendPolicy", policy =>
+                {
+                    policy.WithOrigins(
+                            "https://project-grogu-pi.vercel.app",
+                            "http://localhost:3000"
+                        )
+                        .AllowAnyHeader()
+                        .AllowAnyMethod();
+                });
+            });
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -44,9 +57,14 @@ namespace Grogu_backend
                 app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "Grogu_backend v1"));
             }
 
-            app.UseHttpsRedirection();
+            if (env.IsDevelopment())
+            {
+                app.UseHttpsRedirection();
+            }
 
             app.UseRouting();
+
+            app.UseCors("FrontendPolicy");
 
             app.UseAuthorization();
 
