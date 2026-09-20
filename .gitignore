@@ -63,6 +63,11 @@ project.lock.json
 project.fragment.lock.json
 artifacts/
 
+# Local runtime secrets
+.env
+.env.*
+!.env.example
+
 # ASP.NET Scaffolding
 ScaffoldingReadMe.txt
 
