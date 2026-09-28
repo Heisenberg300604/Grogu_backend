@@ -1,0 +1,64 @@
+name: Backend CI
+
+on:
+  pull_request:
+  push:
+
+# A new run for the same branch supersedes an older one. This saves runner
+# minutes while a pull request is being updated rapidly.
+concurrency:
+  group: backend-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Restore, build, and test
+    runs-on: ubuntu-latest
+    # .NET 5 is end-of-life and can be incompatible with the libraries on the
+    # newest hosted runner image. Build in the same supported SDK image the
+    # Dockerfile already uses until the app is migrated to a supported LTS.
+    container:
+      image: mcr.microsoft.com/dotnet/sdk:5.0
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore
+        run: dotnet restore Grogu_backend.sln
+
+      - name: Build
+        run: dotnet build Grogu_backend.sln --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test Grogu_backend.sln --configuration Release --no-restore
+
+  container:
+    name: Build and smoke-test container
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build --tag grogu-backend:ci .
+
+      # The health endpoint does not require a database. Development is set
+      # solely for this smoke test so no production secret is needed in CI.
+      - name: Start container
+        run: >-
+          docker run --detach --rm --name grogu-backend-ci --publish 8080:80
+          --env ASPNETCORE_ENVIRONMENT=Development grogu-backend:ci
+
+      - name: Check health endpoint
+        run: curl --fail --retry 10 --retry-connrefused --retry-delay 2 http://localhost:8080/api/health
+
+      - name: Print container logs when a step fails
+        if: failure()
+        run: docker logs grogu-backend-ci
+
+      - name: Stop container
+        if: always()
+        run: docker rm --force grogu-backend-ci
